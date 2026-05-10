@@ -212,7 +212,10 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
     event_type = payload.get("type", "")
     extra = payload.get("extra", {})
 
+    print(f"[dink] player={player_name!r} type={event_type!r} extra={extra}", flush=True)
+
     if not player_name or not event_type:
+        print(f"[dink] ignored: missing playerName or type", flush=True)
         return {"status": "ignored", "reason": "missing playerName or type"}
 
     # Match player by OSRS username (case-insensitive)
@@ -223,6 +226,7 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
         .execute()
     )
     if not player_result.data:
+        print(f"[dink] ignored: player {player_name!r} not registered", flush=True)
         return {"status": "ignored", "reason": "player not registered"}
 
     player_id = player_result.data[0]["id"]
@@ -235,6 +239,8 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
         .not_.is_("trigger_data", "null")
         .execute()
     )
+
+    print(f"[dink] player found, checking {len(tiles.data)} triggered tiles", flush=True)
 
     completed = []
     for tile in tiles.data:
@@ -261,6 +267,7 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
             "image_url": image_url,
         }).execute()
         completed.append(tile["title"])
+        print(f"[dink] completed: {tile['title']}", flush=True)
 
     return {"status": "ok", "completed": completed}
 
