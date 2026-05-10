@@ -5,8 +5,8 @@
 /* ── Scrollbar ─────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.38); }
+::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.25); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.45); }
 
 /* ── Space nebula shimmer (hero title) ─────────────────── */
 @keyframes space-shimmer {
@@ -48,7 +48,7 @@
 /* ── Page-level space glow ─────────────────────────────── */
 .page-bg {
   background:
-    radial-gradient(ellipse 70% 35% at 50% 0%, rgba(139,92,246,0.08) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 20% at 80% 100%, rgba(56,189,248,0.04) 0%, transparent 60%),
-    #07070f;
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(139,92,246,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 30% at 50% 100%, rgba(167,139,250,0.04) 0%, transparent 60%),
+    #020202;
 }

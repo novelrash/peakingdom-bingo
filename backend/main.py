@@ -73,7 +73,7 @@ def get_tiles():
 def get_completions():
     result = (
         supabase.table("tile_completions")
-        .select("id, tile_id, player_id, team_id, status, source, image_url, submitted_at, players(username), tiles(title, points)")
+        .select("id, tile_id, player_id, team_id, status, source, image_url, submitted_at, players(username), tiles(title, points), teams(name)")
         .execute()
     )
     return result.data
