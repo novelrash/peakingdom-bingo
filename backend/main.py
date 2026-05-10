@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from typing import Optional
 import httpx
+import json
+import time
 import os
 
 load_dotenv()
@@ -71,7 +73,7 @@ def get_tiles():
 def get_completions():
     result = (
         supabase.table("tile_completions")
-        .select("id, tile_id, player_id, team_id, status, submitted_at, players(username), tiles(title, points)")
+        .select("id, tile_id, player_id, team_id, status, source, image_url, submitted_at, players(username), tiles(title, points)")
         .execute()
     )
     return result.data
@@ -168,15 +170,43 @@ def _match_trigger(trigger: dict, event_type: str, extra: dict) -> bool:
     if event_type == "COMBAT_ACHIEVEMENT":
         return trigger.get("task", "").lower() in extra.get("task", "").lower()
 
+    if event_type == "DEATH":
+        return True
+
     return False
 
 
+async def _upload_screenshot(file) -> Optional[str]:
+    try:
+        content = await file.read()
+        ext = (file.filename or "screenshot.png").rsplit(".", 1)[-1]
+        path = f"dink/{int(time.time() * 1000)}.{ext}"
+        supabase.storage.from_("completion-images").upload(
+            path, content, {"content-type": file.content_type or "image/png"}
+        )
+        return supabase.storage.from_("completion-images").get_public_url(path)
+    except Exception:
+        return None
+
+
 @app.post("/api/webhooks/dink")
-async def dink_webhook(payload: dict, x_dink_secret: Optional[str] = Header(None)):
+async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(None)):
     # Optional webhook secret — set DINK_WEBHOOK_SECRET in backend .env to enable
     expected = os.getenv("DINK_WEBHOOK_SECRET")
     if expected and x_dink_secret != expected:
         raise HTTPException(status_code=403, detail="Invalid webhook secret")
+
+    # Dink sends multipart when image is attached, plain JSON otherwise
+    content_type = request.headers.get("content-type", "")
+    image_url = None
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        payload = json.loads(form.get("payload", "{}"))
+        screenshot = form.get("screenshot")
+        if screenshot and hasattr(screenshot, "read"):
+            image_url = await _upload_screenshot(screenshot)
+    else:
+        payload = await request.json()
 
     player_name = payload.get("playerName", "").strip()
     event_type = payload.get("type", "")
@@ -226,8 +256,9 @@ async def dink_webhook(payload: dict, x_dink_secret: Optional[str] = Header(None
             "tile_id": tile["id"],
             "player_id": player_id,
             "team_id": team_id,
-            "status": "approved",  # Dink events are game-verified
+            "status": "approved",
             "source": "dink",
+            "image_url": image_url,
         }).execute()
         completed.append(tile["title"])
 
@@ -241,6 +272,7 @@ async def dink_webhook(payload: dict, x_dink_secret: Optional[str] = Header(None
 class CompletionSubmit(BaseModel):
     tile_id: str
     player_id: str
+    image_url: Optional[str] = None
 
 
 @app.post("/api/completions", status_code=201)
@@ -256,6 +288,7 @@ def submit_completion(payload: CompletionSubmit):
         .select("id, status")
         .eq("tile_id", payload.tile_id)
         .eq("team_id", team_id)
+        .in_("status", ["pending", "approved"])
         .execute()
     )
     if existing.data:
@@ -268,6 +301,7 @@ def submit_completion(payload: CompletionSubmit):
         "team_id": team_id,
         "status": "pending",
         "source": "manual",
+        "image_url": payload.image_url,
     }).execute()
     return result.data[0]
 
@@ -370,6 +404,23 @@ def review_completion(completion_id: str, status: str, admin=Depends(verify_admi
         raise HTTPException(status_code=400, detail="status must be 'approved' or 'rejected'")
     result = supabase.table("tile_completions").update({"status": status}).eq("id", completion_id).execute()
     return result.data[0]
+
+
+@app.delete("/api/admin/completions/{completion_id}", status_code=204)
+def delete_completion(completion_id: str, admin=Depends(verify_admin)):
+    supabase.table("tile_completions").delete().eq("id", completion_id).execute()
+
+
+@app.get("/api/admin/completions/approved")
+def get_approved_completions(admin=Depends(verify_admin)):
+    result = (
+        supabase.table("tile_completions")
+        .select("*, players(username), tiles(title, points), teams(name)")
+        .eq("status", "approved")
+        .order("submitted_at", desc=True)
+        .execute()
+    )
+    return result.data
 
 
 class EventSettings(BaseModel):

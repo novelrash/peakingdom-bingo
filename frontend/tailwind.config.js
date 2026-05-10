@@ -2,17 +2,24 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        cinzel: ['Bebas Neue', 'sans-serif'],
+      },
       colors: {
         osrs: {
-          gold: '#ffb000',
-          'gold-bright': '#ffd700',
-          bronze: '#cd7f32',
+          gold: '#a78bfa',
+          'gold-bright': '#c4b5fd',
+          bronze: '#7c3aed',
         },
         surface: {
-          base: '#0a0a0a',
-          raised: '#1a1a1a',
-          overlay: '#2a2a2a',
+          base: '#07070f',
+          raised: '#0e0e1e',
+          overlay: '#161628',
         },
+      },
+      boxShadow: {
+        'gold-sm': '0 0 12px rgba(167,139,250,0.12)',
+        'gold-md': '0 0 24px rgba(167,139,250,0.18)',
       },
     },
   },

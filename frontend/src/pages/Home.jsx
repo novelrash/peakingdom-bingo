@@ -66,13 +66,14 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-base text-white flex flex-col">
+    <div className="min-h-screen page-bg text-white flex flex-col">
       <Nav eventName={settings?.event_name} />
 
       {/* Hero */}
       <section className="flex-1 flex flex-col items-center justify-center text-center px-4 py-16 gap-6">
-        <h1 className="text-5xl font-bold tracking-tight">
-          {settings?.event_name || 'OSRS Bingo'}
+        <h1 className="font-cinzel leading-none tracking-wide text-shimmer-gold drop-shadow-lg">
+          <span className="block text-6xl md:text-8xl">Pea Kingdom</span>
+          <span className="block text-6xl md:text-8xl">Bingo</span>
         </h1>
 
         {(settings?.event_start || settings?.event_end) && (
@@ -166,25 +167,23 @@ export default function Home() {
       </section>
 
       {/* Stats bar */}
-      <section className="border-t border-white/10 py-6">
-        <div className="max-w-lg mx-auto grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-osrs-gold">{stats.teams}</p>
-            <p className="text-white/40 text-xs uppercase tracking-wide">Teams</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-osrs-gold">{stats.players}</p>
-            <p className="text-white/40 text-xs uppercase tracking-wide">Players</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-osrs-gold">{stats.tilesCompleted}</p>
-            <p className="text-white/40 text-xs uppercase tracking-wide">Tiles Completed</p>
-          </div>
+      <section className="border-t border-white/5 py-8">
+        <div className="max-w-lg mx-auto grid grid-cols-3 gap-3 px-4">
+          {[
+            { value: stats.teams, label: 'Teams' },
+            { value: stats.players, label: 'Players' },
+            { value: stats.tilesCompleted, label: 'Tiles Completed' },
+          ].map(({ value, label }) => (
+            <div key={label} className="bg-surface-raised border border-osrs-gold/10 rounded-xl py-5 px-2 text-center shadow-gold-sm">
+              <p className="text-3xl font-cinzel font-bold text-osrs-gold">{value}</p>
+              <p className="text-white/35 text-[10px] uppercase tracking-widest mt-1">{label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      <footer className="text-center text-white/20 text-xs py-4">
-        <Link to="/admin/login" className="hover:text-white/40 transition-colors">Admin</Link>
+      <footer className="text-center text-white/15 text-xs py-5 border-t border-white/5">
+        <Link to="/admin/login" className="hover:text-white/35 transition-colors">Admin</Link>
       </footer>
     </div>
   )

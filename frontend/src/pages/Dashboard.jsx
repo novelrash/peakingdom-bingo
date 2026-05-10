@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [editSettings, setEditSettings] = useState({ event_name: '', event_start: '', event_end: '' })
   const [dinkConfigRaw, setDinkConfigRaw] = useState('')
   const [dinkConfigError, setDinkConfigError] = useState('')
+  const [approved, setApproved] = useState([])
   const [saving, setSaving] = useState(false)
   const [savingDink, setSavingDink] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -41,15 +42,17 @@ export default function Dashboard() {
   useEffect(() => { load() }, [tab])
 
   async function load() {
-    const [t, ti, p, s] = await Promise.all([
+    const [t, ti, p, a, s] = await Promise.all([
       api('/api/admin/teams'),
       api('/api/tiles'),
       tab === 'completions' ? api('/api/admin/completions') : Promise.resolve([]),
+      tab === 'completions' ? api('/api/admin/completions/approved') : Promise.resolve([]),
       api('/api/admin/settings'),
     ])
     setTeams(t || [])
     setTiles(ti || [])
     setPending(p || [])
+    setApproved(a || [])
     setSettings(s || {})
     setEditSettings({
       event_name: s?.event_name || '',
@@ -134,6 +137,13 @@ export default function Dashboard() {
     setPending(prev => prev.filter(c => c.id !== id))
   }
 
+  async function deleteCompletion(id) {
+    if (!confirm('Remove this completion permanently?')) return
+    await api(`/api/admin/completions/${id}`, 'DELETE')
+    setPending(prev => prev.filter(c => c.id !== id))
+    setApproved(prev => prev.filter(c => c.id !== id))
+  }
+
   async function saveSettings(e) {
     e.preventDefault()
     setSaving(true)
@@ -210,30 +220,82 @@ export default function Dashboard() {
                 <p className="text-white/30 text-center py-8">No pending submissions.</p>
               )}
               {pending.map(c => (
-                <div key={c.id} className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-white">{c.tiles?.title}</p>
-                    <p className="text-sm text-white/50">
-                      {c.players?.username} · Team {c.teams?.name} · {c.tiles?.points} pts
-                    </p>
-                    <p className="text-xs text-white/30">{new Date(c.submitted_at).toLocaleString()}</p>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => review(c.id, 'approved')}
-                      className="bg-green-900/40 border border-green-500/30 text-green-400 px-3 py-1 rounded text-sm hover:bg-green-900/60 transition-colors"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => review(c.id, 'rejected')}
-                      className="bg-red-900/40 border border-red-500/30 text-red-400 px-3 py-1 rounded text-sm hover:bg-red-900/60 transition-colors"
-                    >
-                      Reject
-                    </button>
+                <div key={c.id} className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+                  {c.image_url && (
+                    <a href={c.image_url} target="_blank" rel="noreferrer">
+                      <img
+                        src={c.image_url}
+                        alt="Submission screenshot"
+                        className="w-full max-h-64 object-cover border-b border-white/10 hover:opacity-90 transition-opacity cursor-pointer"
+                      />
+                    </a>
+                  )}
+                  <div className="px-4 py-3 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-white">{c.tiles?.title}</p>
+                      <p className="text-sm text-white/50">
+                        {c.players?.username} · Team {c.teams?.name} · {c.tiles?.points} pts
+                      </p>
+                      <p className="text-xs text-white/30">{new Date(c.submitted_at).toLocaleString()}</p>
+                      {!c.image_url && (
+                        <p className="text-xs text-white/20 mt-0.5">No screenshot provided</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => review(c.id, 'approved')}
+                        className="bg-green-900/40 border border-green-500/30 text-green-400 px-3 py-1 rounded text-sm hover:bg-green-900/60 transition-colors"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => review(c.id, 'rejected')}
+                        className="bg-red-900/40 border border-red-500/30 text-red-400 px-3 py-1 rounded text-sm hover:bg-red-900/60 transition-colors"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => deleteCompletion(c.id)}
+                        className="border border-white/10 text-white/30 px-2 py-1 rounded text-sm hover:text-red-400 hover:border-red-500/30 transition-colors"
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
+
+              {/* Approved completions */}
+              {approved.length > 0 && (
+                <div className="mt-6 border-t border-white/10 pt-6">
+                  <h3 className="font-semibold text-white/50 mb-3 text-sm uppercase tracking-wide">
+                    Approved ({approved.length})
+                  </h3>
+                  <div className="space-y-1.5">
+                    {approved.map(c => (
+                      <div key={c.id} className="flex items-center gap-3 px-3 py-2 bg-white/3 border border-white/5 rounded-lg">
+                        {c.image_url && (
+                          <a href={c.image_url} target="_blank" rel="noreferrer">
+                            <img src={c.image_url} className="w-10 h-10 rounded object-cover flex-shrink-0 hover:opacity-80 transition-opacity" />
+                          </a>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white/80 truncate">{c.tiles?.title}</p>
+                          <p className="text-xs text-white/35">{c.players?.username} · {c.teams?.name} · {c.tiles?.points} pts</p>
+                        </div>
+                        <button
+                          onClick={() => deleteCompletion(c.id)}
+                          className="text-white/20 hover:text-red-400 transition-colors text-sm flex-shrink-0 px-2"
+                          title="Remove completion"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

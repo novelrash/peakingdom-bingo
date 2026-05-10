@@ -1,28 +1,18 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-function RankBadge({ rank }) {
-  const base = 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0'
-  if (rank === 1) return (
-    <span className={base} style={{ background: 'radial-gradient(circle, #ffd700, #ffed4e)', color: '#0a0a0a' }}>1</span>
-  )
-  if (rank === 2) return (
-    <span className={base} style={{ background: 'radial-gradient(circle, #c0c0c0, #e5e5e5)', color: '#0a0a0a' }}>2</span>
-  )
-  if (rank === 3) return (
-    <span className={base} style={{ background: 'radial-gradient(circle, #cd7f32, #daa520)', color: '#fff' }}>3</span>
-  )
-  return (
-    <span className={`${base} bg-white/10 text-white/40`}>{rank}</span>
-  )
-}
+const RANK_STYLES = [
+  { border: 'border-l-yellow-400',  bg: 'bg-yellow-500/5',  text: 'text-yellow-300', num: 'text-yellow-400' },
+  { border: 'border-l-slate-300',   bg: 'bg-slate-400/4',   text: 'text-slate-300',  num: 'text-slate-400' },
+  { border: 'border-l-amber-600',   bg: 'bg-amber-700/6',   text: 'text-amber-500',  num: 'text-amber-600' },
+]
 
 export default function Leaderboard({ teams, players }) {
   const [tab, setTab] = useState('teams')
 
   return (
     <div>
-      <div className="flex gap-4 border-b border-white/10 mb-4">
+      <div className="flex gap-4 border-b border-white/10 mb-5">
         {['teams', 'players'].map(t => (
           <button
             key={t}
@@ -39,24 +29,34 @@ export default function Leaderboard({ teams, players }) {
       </div>
 
       {tab === 'teams' && (
-        <ol className="space-y-1">
+        <ol className="space-y-2">
           {teams.length === 0 && <li className="text-white/30 text-sm py-4 text-center">No scores yet.</li>}
-          {teams.map((team, i) => (
-            <li key={team.id}>
-              <Link
-                to={`/team/${team.id}`}
-                className="flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-lg border border-transparent hover:bg-white/5 hover:border-white/10 transition-all group"
-              >
-                <RankBadge rank={i + 1} />
-                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
-                <span className="flex-1 font-medium text-white/90 group-hover:text-osrs-gold transition-colors">
-                  {team.name}
-                </span>
-                <span className="font-bold text-osrs-gold">{team.points} pts</span>
-                <span className="text-white/20 text-xs group-hover:text-white/40 transition-colors">→</span>
-              </Link>
-            </li>
-          ))}
+          {teams.map((team, i) => {
+            const ranked = i < 3
+            const rs = RANK_STYLES[i] ?? null
+            return (
+              <li key={team.id}>
+                <Link
+                  to={`/team/${team.id}`}
+                  className={[
+                    'flex items-center gap-3 rounded-lg border-l-4 border border-white/5 px-4 transition-all cursor-pointer group',
+                    ranked ? `${rs.border} ${rs.bg} py-3.5 hover:brightness-110` : 'border-l-white/10 bg-white/3 py-2.5 hover:bg-white/6',
+                  ].join(' ')}
+                >
+                  <span className={`font-cinzel font-bold flex-shrink-0 ${ranked ? `text-lg ${rs.num}` : 'text-sm text-white/30'}`}>
+                    {i + 1}
+                  </span>
+                  <span className={`flex-1 font-semibold group-hover:underline underline-offset-2 transition-colors ${ranked ? 'text-base text-white' : 'text-sm text-white/80'}`}>
+                    {team.name}
+                  </span>
+                  <span className={`font-bold ${ranked ? `text-base ${rs.text}` : 'text-sm text-osrs-gold/80'}`}>
+                    {team.points} pts
+                  </span>
+                  <span className="text-white/30 text-sm group-hover:text-white/60 group-hover:translate-x-0.5 transition-all">→</span>
+                </Link>
+              </li>
+            )
+          })}
         </ol>
       )}
 
@@ -65,19 +65,29 @@ export default function Leaderboard({ teams, players }) {
           {players.length === 0 && <li className="text-white/30 text-sm py-4 text-center">No scores yet.</li>}
           {players.map((player, i) => (
             <li key={player.id} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
-              <RankBadge rank={i + 1} />
+              <span className="w-6 text-center text-xs font-bold text-white/30 flex-shrink-0">{i + 1}</span>
               <div className="flex-1">
-                <p className="font-medium text-white/90">{player.username}</p>
+                {player.team ? (
+                  <Link
+                    to={`/team/${player.team.id}`}
+                    state={{ playerId: player.id }}
+                    className="font-medium text-white/90 hover:text-osrs-gold hover:underline underline-offset-2 transition-colors"
+                  >
+                    {player.username}
+                  </Link>
+                ) : (
+                  <p className="font-medium text-white/90">{player.username}</p>
+                )}
                 {player.team && (
                   <Link
-                    to={`/team/${player.team.id || ''}`}
-                    className="text-xs text-white/35 hover:text-osrs-gold/70 transition-colors"
+                    to={`/team/${player.team.id}`}
+                    className="text-xs text-white/35 hover:text-osrs-gold/70 hover:underline underline-offset-2 transition-colors"
                   >
                     {player.team.name}
                   </Link>
                 )}
               </div>
-              <span className="font-bold text-osrs-gold">{player.points} pts</span>
+              <span className="font-bold text-osrs-gold text-sm">{player.points} pts</span>
             </li>
           ))}
         </ol>

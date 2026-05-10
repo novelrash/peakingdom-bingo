@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import Nav from '../components/Nav'
 
 const API = import.meta.env.VITE_API_URL || ''
@@ -15,20 +15,14 @@ function timeAgo(dateStr) {
   return `${days}d ago`
 }
 
-function RankNum({ rank }) {
-  const base = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0'
-  if (rank === 1) return <span className={base} style={{ background: 'radial-gradient(circle, #ffd700, #ffed4e)', color: '#0a0a0a' }}>1</span>
-  if (rank === 2) return <span className={base} style={{ background: 'radial-gradient(circle, #c0c0c0, #e5e5e5)', color: '#0a0a0a' }}>2</span>
-  if (rank === 3) return <span className={base} style={{ background: 'radial-gradient(circle, #cd7f32, #daa520)', color: '#fff' }}>3</span>
-  return <span className={`${base} bg-white/10 text-white/40`}>{rank}</span>
-}
-
 export default function TeamPage() {
   const { teamId } = useParams()
+  const location = useLocation()
   const [team, setTeam] = useState(null)
   const [members, setMembers] = useState([])
   const [completions, setCompletions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selectedPlayerId, setSelectedPlayerId] = useState(location.state?.playerId || null)
 
   useEffect(() => {
     Promise.all([
@@ -44,7 +38,6 @@ export default function TeamPage() {
         c => c.team_id === teamId && c.status === 'approved'
       )
 
-      // Per-player points and tile count
       const byPlayer = {}
       for (const c of approved) {
         if (!byPlayer[c.player_id]) byPlayer[c.player_id] = { points: 0, count: 0 }
@@ -66,14 +59,14 @@ export default function TeamPage() {
   }, [teamId])
 
   if (loading) return (
-    <div className="min-h-screen bg-surface-base text-white">
+    <div className="min-h-screen page-bg text-white">
       <Nav />
       <div className="text-center py-20 text-white/30">Loading…</div>
     </div>
   )
 
   if (!team) return (
-    <div className="min-h-screen bg-surface-base text-white">
+    <div className="min-h-screen page-bg text-white">
       <Nav />
       <div className="text-center py-20 text-white/30">
         Team not found. <Link to="/leaderboard" className="text-osrs-gold/70 hover:text-osrs-gold">← Back</Link>
@@ -81,77 +74,117 @@ export default function TeamPage() {
     </div>
   )
 
-  const recent = completions.slice(0, 10)
+  const visibleCompletions = selectedPlayerId
+    ? completions.filter(c => c.player_id === selectedPlayerId)
+    : completions.slice(0, 10)
+
+  const selectedMember = members.find(m => m.id === selectedPlayerId)
   const totalTiles = completions.length
 
   return (
-    <div className="min-h-screen bg-surface-base text-white">
+    <div className="min-h-screen page-bg text-white">
       <Nav />
 
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Team header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div
+          className="rounded-xl border border-white/8 p-6 mb-8 relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${team.color}18 0%, transparent 60%), #0e0e1e` }}
+        >
           <div
-            className="w-14 h-14 rounded-full flex-shrink-0 border-2 border-white/10"
-            style={{ backgroundColor: team.color }}
+            className="absolute inset-0 opacity-5 rounded-xl"
+            style={{ background: `radial-gradient(ellipse 60% 80% at 15% 50%, ${team.color}, transparent)` }}
           />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold text-white truncate">{team.name}</h1>
-            <p className="text-white/40 text-sm mt-0.5">
-              <span className="text-osrs-gold font-semibold">{team.points} pts</span>
-              {' · '}
-              {members.length} members
-              {' · '}
-              {totalTiles} tiles completed
-            </p>
+          <div className="relative flex items-center gap-5">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl font-cinzel font-bold text-white truncate">{team.name}</h1>
+              <p className="text-white/45 text-sm mt-1">
+                <span className="text-osrs-gold font-bold">{team.points} pts</span>
+                {' · '}
+                {members.length} members
+                {' · '}
+                {totalTiles} tiles completed
+              </p>
+            </div>
+            <Link
+              to="/leaderboard"
+              className="text-sm text-white/30 hover:text-white/60 transition-colors flex-shrink-0"
+            >
+              ← Leaderboard
+            </Link>
           </div>
-          <Link
-            to="/leaderboard"
-            className="text-sm text-white/30 hover:text-white/60 transition-colors flex-shrink-0"
-          >
-            ← Leaderboard
-          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Members */}
           <section>
-            <h2 className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Members</h2>
+            <h2 className="text-xs font-cinzel font-semibold text-white/40 uppercase tracking-widest mb-3">
+              Members
+              <span className="ml-2 text-white/20 normal-case font-sans font-normal">(click to filter)</span>
+            </h2>
             <div className="space-y-2">
               {members.length === 0 && (
                 <p className="text-white/30 text-sm">No members on this team.</p>
               )}
-              {members.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-lg px-4 py-3"
-                >
-                  <RankNum rank={i + 1} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white/90 truncate">{m.username}</p>
-                    <p className="text-xs text-white/35">{m.tilesCompleted} tiles</p>
-                  </div>
-                  <span className="font-bold text-osrs-gold text-sm">{m.points} pts</span>
-                </div>
-              ))}
+              {members.map((m, i) => {
+                const isSelected = selectedPlayerId === m.id
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelectedPlayerId(isSelected ? null : m.id)}
+                    className={[
+                      'w-full flex items-center gap-3 rounded-lg px-4 py-3 border transition-all text-left cursor-pointer',
+                      isSelected
+                        ? 'bg-osrs-gold/10 border-osrs-gold/30 ring-1 ring-osrs-gold/20'
+                        : 'bg-white/5 border-white/8 hover:bg-white/8 hover:border-white/15',
+                    ].join(' ')}
+                  >
+                    <span className="w-5 text-center text-xs font-bold text-white/30 flex-shrink-0">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium truncate ${isSelected ? 'text-osrs-gold' : 'text-white/90'}`}>
+                        {m.username}
+                      </p>
+                      <p className="text-xs text-white/35">{m.tilesCompleted} tiles</p>
+                    </div>
+                    <span className={`font-bold text-sm flex-shrink-0 ${isSelected ? 'text-osrs-gold' : 'text-osrs-gold/70'}`}>
+                      {m.points} pts
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </section>
 
-          {/* Recent completions */}
+          {/* Completions */}
           <section>
-            <h2 className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Recent Completions</h2>
+            <h2 className="text-xs font-cinzel font-semibold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-2">
+              {selectedMember ? (
+                <>
+                  <span>{selectedMember.username}'s Tiles</span>
+                  <button
+                    onClick={() => setSelectedPlayerId(null)}
+                    className="text-white/25 hover:text-white/60 normal-case font-sans font-normal transition-colors"
+                    title="Clear filter"
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : 'Recent Completions'}
+            </h2>
             <div className="space-y-2">
-              {recent.length === 0 && (
+              {visibleCompletions.length === 0 && (
                 <p className="text-white/30 text-sm">Nothing completed yet.</p>
               )}
-              {recent.map(c => (
+              {visibleCompletions.map(c => (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-lg px-4 py-3"
+                  className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-lg px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white/90 truncate">{c.tiles?.title}</p>
-                    <p className="text-xs text-white/35">{c.players?.username}</p>
+                    {!selectedPlayerId && (
+                      <p className="text-xs text-white/35">{c.players?.username}</p>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-sm font-bold text-osrs-gold">{c.tiles?.points} pts</p>
@@ -159,32 +192,14 @@ export default function TeamPage() {
                   </div>
                 </div>
               ))}
+              {!selectedPlayerId && completions.length > 10 && (
+                <p className="text-xs text-white/25 text-center pt-1">
+                  Click a member to see all their completions
+                </p>
+              )}
             </div>
           </section>
         </div>
-
-        {/* All completions */}
-        {completions.length > 10 && (
-          <details className="mt-8 border-t border-white/5 pt-6">
-            <summary className="cursor-pointer select-none text-sm text-white/35 hover:text-white/60 transition-colors">
-              All completions ({completions.length})
-            </summary>
-            <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {completions.map(c => (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-white/5"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-green-400 text-xs flex-shrink-0">✓</span>
-                    <span className="text-xs text-white/60 truncate">{c.tiles?.title}</span>
-                  </div>
-                  <span className="text-xs text-osrs-gold/70 flex-shrink-0 ml-2">{c.tiles?.points} pts</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Nav from '../components/Nav'
 import BingoGrid from '../components/BingoGrid'
 import { usePlayer } from '../lib/usePlayer'
+import { supabase } from '../lib/supabase'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -28,11 +29,14 @@ export default function Tiles() {
   const [completions, setCompletions] = useState([])
   const [confirmTile, setConfirmTile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [uploadError, setUploadError] = useState(null)
   const [toast, setToast] = useState(null)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('points')
   const [tier, setTier] = useState('all')
-  const [completedOpen, setCompletedOpen] = useState(false)
+  const [showCompleted, setShowCompleted] = useState(false)
   const { playerId, playerName, playerTeam } = usePlayer()
 
   useEffect(() => {
@@ -70,17 +74,51 @@ export default function Tiles() {
   }, [tiles, search, sort, tier])
 
   const activeTiles = filteredSorted.filter(t => !approvedIds.has(t.id))
-  const completedTiles = filteredSorted.filter(t => approvedIds.has(t.id))
+  const displayTiles = showCompleted ? filteredSorted : activeTiles
+
+  function handleImageSelect(file) {
+    if (!file) return
+    setImageFile(file)
+    setUploadError(null)
+    const reader = new FileReader()
+    reader.onload = e => setImagePreview(e.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  function clearImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    setUploadError(null)
+  }
 
   async function submitCompletion(tile) {
     setSubmitting(true)
+    setUploadError(null)
+    let image_url = null
+
+    if (imageFile) {
+      const ext = imageFile.name.split('.').pop()
+      const path = `manual/${playerId}/${tile.id}_${Date.now()}.${ext}`
+      const { data, error } = await supabase.storage
+        .from('completion-images')
+        .upload(path, imageFile, { contentType: imageFile.type, upsert: false })
+      if (error) {
+        setUploadError(`Image upload failed: ${error.message}`)
+        setSubmitting(false)
+        return
+      }
+      const { data: { publicUrl } } = supabase.storage.from('completion-images').getPublicUrl(data.path)
+      image_url = publicUrl
+    }
+
     const res = await fetch(`${API}/api/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tile_id: tile.id, player_id: playerId }),
+      body: JSON.stringify({ tile_id: tile.id, player_id: playerId, image_url }),
     })
     setSubmitting(false)
     setConfirmTile(null)
+    clearImage()
     if (res.ok) {
       const newComp = await res.json()
       setCompletions(prev => [...prev, newComp])
@@ -97,13 +135,13 @@ export default function Tiles() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-base text-white">
+    <div className="min-h-screen page-bg text-white">
       <Nav eventName={settings?.event_name} />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header row */}
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-2xl font-bold text-white">Bingo Tiles</h1>
+          <h1 className="text-2xl font-cinzel font-bold text-osrs-gold">Bingo Tiles</h1>
           {playerId && playerTeam ? (
             <div className="flex items-center gap-2 text-sm bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: playerTeam.color }} />
@@ -153,33 +191,48 @@ export default function Tiles() {
             </div>
           </div>
 
-          {/* Tier filter */}
-          <div className="flex gap-1.5">
-            {TIERS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTier(t.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                  tier === t.key
-                    ? TIER_ACTIVE[t.key]
-                    : 'bg-surface-raised border-white/10 text-white/40 hover:text-white/70'
-                }`}
-              >
-                {t.dot && <span className={`w-2 h-2 rounded-full ${t.dot} flex-shrink-0`} />}
-                {t.label}
-              </button>
-            ))}
+          {/* Tier filter + completed toggle */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-1.5">
+              {TIERS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setTier(t.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    tier === t.key
+                      ? TIER_ACTIVE[t.key]
+                      : 'bg-surface-raised border-white/10 text-white/40 hover:text-white/70'
+                  }`}
+                >
+                  {t.dot && <span className={`w-2 h-2 rounded-full ${t.dot} flex-shrink-0`} />}
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {approvedIds.size > 0 && (
+              <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={showCompleted}
+                  onChange={e => setShowCompleted(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded accent-green-500 cursor-pointer"
+                />
+                <span className="text-xs text-white/40 hover:text-white/60 transition-colors">
+                  Show completed ({approvedIds.size})
+                </span>
+              </label>
+            )}
           </div>
         </div>
 
-        {/* Active tiles */}
         {tiles.length === 0 ? (
           <div className="text-center py-20 text-white/30">No tiles have been added yet.</div>
-        ) : activeTiles.length === 0 && (search || tier !== 'all') ? (
+        ) : displayTiles.length === 0 && (search || tier !== 'all') ? (
           <div className="text-center py-20 text-white/30">No tiles match your filters.</div>
         ) : (
           <BingoGrid
-            tiles={activeTiles}
+            tiles={displayTiles}
             completions={teamCompletions}
             playerId={playerId}
             onSubmit={tile => setConfirmTile(tile)}
@@ -191,32 +244,6 @@ export default function Tiles() {
             ? 'Select your name on the home page to submit completions.'
             : 'Click a tile to submit it for admin approval.'}
         </p>
-
-        {/* Completed tiles — collapsible */}
-        {completedTiles.length > 0 && (
-          <div className="mt-10 border-t border-white/5 pt-6">
-            <button
-              onClick={() => setCompletedOpen(o => !o)}
-              className="flex items-center gap-2 text-sm text-white/35 hover:text-white/60 transition-colors select-none"
-            >
-              <span className={`transition-transform duration-200 ${completedOpen ? 'rotate-90' : ''}`}>▶</span>
-              Completed by your team ({completedTiles.length})
-            </button>
-            {completedOpen && (
-              <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-                {completedTiles.map(tile => (
-                  <li key={tile.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/3 border border-white/5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-green-400 text-xs flex-shrink-0">✓</span>
-                      <span className="text-xs text-white/30 line-through truncate">{tile.title}</span>
-                    </div>
-                    <span className="text-xs text-white/20 flex-shrink-0 ml-2">{tile.points} pts</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Confirm modal */}
@@ -229,17 +256,47 @@ export default function Tiles() {
             {confirmTile.description && (
               <p className="text-sm text-white/60 mt-2">{confirmTile.description}</p>
             )}
+
+            <div className="mt-4">
+              <label className="block text-xs text-white/50 mb-1.5">
+                Screenshot <span className="text-red-400/70">*required</span>
+              </label>
+              {imagePreview ? (
+                <div className="relative rounded-lg overflow-hidden border border-white/10">
+                  <img src={imagePreview} alt="Preview" className="w-full max-h-40 object-cover" />
+                  <button
+                    onClick={clearImage}
+                    className="absolute top-1.5 right-1.5 bg-black/60 text-white/70 hover:text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                  >✕</button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 bg-white/5 border border-dashed border-white/15 rounded-lg px-3 py-4 cursor-pointer hover:border-white/30 hover:bg-white/8 transition-colors">
+                  <span className="text-xs text-white/40">Click to attach screenshot…</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => handleImageSelect(e.target.files?.[0] || null)}
+                  />
+                </label>
+              )}
+              {uploadError && (
+                <p className="text-xs text-red-400 mt-1.5">{uploadError}</p>
+              )}
+            </div>
+
             <div className="flex gap-3 mt-5">
               <button
                 onClick={() => submitCompletion(confirmTile)}
-                disabled={submitting}
-                className="flex-1 bg-osrs-gold text-surface-base py-2 rounded-lg font-bold hover:bg-osrs-gold-bright disabled:opacity-50 transition-colors"
+                disabled={submitting || !imageFile}
+                className="flex-1 bg-osrs-gold text-surface-base py-2 rounded-lg font-bold hover:bg-osrs-gold-bright disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {submitting ? 'Submitting…' : 'Yes, submit'}
+                {submitting ? 'Uploading image…' : 'Yes, submit'}
               </button>
               <button
-                onClick={() => setConfirmTile(null)}
-                className="flex-1 border border-white/10 py-2 rounded-lg text-white/60 hover:bg-white/5 transition-colors"
+                onClick={() => { setConfirmTile(null); clearImage() }}
+                disabled={submitting}
+                className="flex-1 border border-white/10 py-2 rounded-lg text-white/60 hover:bg-white/5 disabled:opacity-40 transition-colors"
               >
                 Cancel
               </button>

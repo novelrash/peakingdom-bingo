@@ -24,16 +24,16 @@ export default function LeaderboardPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-surface-base text-white">
+    <div className="min-h-screen page-bg text-white">
       <Nav eventName={settings?.event_name} />
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-white mb-6">Leaderboard</h1>
+        <h1 className="text-2xl font-cinzel font-bold text-osrs-gold mb-6">Leaderboard</h1>
 
         {loading ? (
           <p className="text-white/30 text-center py-12">Loading...</p>
         ) : (
-          <div className="bg-white/5 border border-white/10 rounded-xl backdrop-blur-sm p-6">
+          <div className="bg-surface-raised border border-osrs-gold/10 rounded-xl shadow-gold-sm p-6">
             <Leaderboard teams={teamLeaderboard} players={playerLeaderboard} />
           </div>
         )}

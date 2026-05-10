@@ -15,10 +15,18 @@ function diff(target) {
 function Unit({ value, label }) {
   return (
     <div className="text-center">
-      <span className="text-3xl font-bold tabular-nums">{String(value).padStart(2, '0')}</span>
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+      <div className="bg-surface-raised border border-osrs-gold/25 rounded-lg px-3 py-2 min-w-[54px] shadow-gold-sm">
+        <span className="text-2xl font-cinzel font-bold text-osrs-gold tabular-nums">
+          {String(value).padStart(2, '0')}
+        </span>
+      </div>
+      <p className="text-[10px] text-white/35 uppercase tracking-widest mt-1.5">{label}</p>
     </div>
   )
+}
+
+function Sep() {
+  return <span className="text-osrs-gold/30 font-bold text-xl mt-2 select-none">:</span>
 }
 
 export default function Countdown({ start, end }) {
@@ -33,7 +41,7 @@ export default function Countdown({ start, end }) {
   const hasEnded = end && new Date(end) <= now
 
   if (hasEnded) {
-    return <div className="text-center text-gray-500 font-medium">Event has ended</div>
+    return <div className="text-center text-white/40 font-medium text-sm">Event has ended</div>
   }
 
   const target = hasStarted ? end : start
@@ -44,11 +52,14 @@ export default function Countdown({ start, end }) {
 
   return (
     <div className="text-center">
-      <p className="text-sm text-gray-500 mb-2">{label}</p>
-      <div className="flex gap-4 justify-center">
+      <p className="text-xs text-osrs-gold/50 mb-3 uppercase tracking-widest font-medium">{label}</p>
+      <div className="flex gap-2 justify-center items-start">
         <Unit value={t.days} label="days" />
+        <Sep />
         <Unit value={t.hours} label="hrs" />
+        <Sep />
         <Unit value={t.minutes} label="min" />
+        <Sep />
         <Unit value={t.seconds} label="sec" />
       </div>
     </div>

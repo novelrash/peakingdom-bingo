@@ -8,16 +8,21 @@ function tierBorderClass(points, status) {
 }
 
 export default function BingoGrid({ tiles, completions, playerId, onSubmit }) {
-  const byTile = Object.fromEntries(completions.map(c => [c.tile_id, c]))
+  // Prefer active (pending/approved) completion over rejected for each tile
+  const byTile = {}
+  for (const c of completions) {
+    const existing = byTile[c.tile_id]
+    if (!existing || existing.status === 'rejected') byTile[c.tile_id] = c
+  }
 
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
       {tiles.map(tile => {
         const completion = byTile[tile.id]
         const status = completion?.status ?? 'none'
         const isDone = status === 'approved'
         const isPending = status === 'pending'
-        const isAvailable = status === 'none' && !!playerId
+        const isAvailable = (status === 'none' || status === 'rejected') && !!playerId
 
         return (
           <button
