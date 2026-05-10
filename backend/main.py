@@ -198,15 +198,21 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
 
     # Dink sends multipart when image is attached, plain JSON otherwise
     content_type = request.headers.get("content-type", "")
+    print(f"[dink] content-type={content_type!r}", flush=True)
     image_url = None
     if "multipart/form-data" in content_type:
         form = await request.form()
+        print(f"[dink] form keys={list(form.keys())}", flush=True)
         payload = json.loads(form.get("payload", "{}"))
         screenshot = form.get("screenshot")
         if screenshot and hasattr(screenshot, "read"):
             image_url = await _upload_screenshot(screenshot)
     else:
-        payload = await request.json()
+        body = await request.body()
+        print(f"[dink] raw body={body[:500]}", flush=True)
+        payload = json.loads(body) if body else {}
+
+    print(f"[dink] payload keys={list(payload.keys())}", flush=True)
 
     player_name = payload.get("playerName", "").strip()
     event_type = payload.get("type", "")
