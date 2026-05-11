@@ -1,4 +1,6 @@
 {
+  "discordWebhook": "https://peakingdom-bingo.onrender.com/api/webhooks/dink",
+  "dynamicConfigUrl": "https://peakingdom-bingo.onrender.com/api/dink/config",
   "killCountInterval": 500,
   "combatTaskEnabled": false,
   "gambleRareNotifMessage": "%USERNAME% has received rare loot at gamble count %COUNT%: \n\n%LOOT%",
@@ -46,10 +48,7 @@
   "lootRarityValueIntersection": true,
   "levelEnabled": true,
   "petEnabled": true,
-  "chatMessageTypes": [
-    "GAME",
-    "COMMAND"
-  ],
+  "chatMessageTypes": ["GAME", "COMMAND"],
   "tradeMinValue": 0,
   "externalSendImage": "REQUESTED",
   "slayerPointThreshold": 0,
@@ -112,10 +111,7 @@
   "combatTaskMinTier": "MEDIUM",
   "grandExchangeIncludeCancelled": false,
   "seasonalPolicy": "FORWARD_TO_LEAGUES",
-  "deathSafeExceptions": [
-    "FIGHT_CAVE",
-    "INFERNO"
-  ],
+  "deathSafeExceptions": ["FIGHT_CAVE", "INFERNO"],
   "groupStorageSendImage": true,
   "levelNotifMessage": "%USERNAME% has levelled %SKILL%",
   "killCountBestTimeMessage": "%USERNAME% has defeated %BOSS% with a new personal best time of %TIME% and a completion count of %COUNT%",

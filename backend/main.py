@@ -13,6 +13,18 @@ load_dotenv()
 
 app = FastAPI(title="OSRS Bingo API")
 
+# Simple in-memory TTL cache for high-traffic read endpoints
+_cache: dict = {}
+CACHE_TTL = 15  # seconds
+
+def cached(key: str, fn):
+    entry = _cache.get(key)
+    if entry and time.time() - entry["ts"] < CACHE_TTL:
+        return entry["data"]
+    data = fn()
+    _cache[key] = {"data": data, "ts": time.time()}
+    return data
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,8 +60,9 @@ def health():
 
 @app.get("/api/settings")
 def get_settings():
-    result = supabase.table("event_settings").select("event_name, event_start, event_end").limit(1).execute()
-    return result.data[0] if result.data else {}
+    return cached("settings", lambda: (
+        supabase.table("event_settings").select("event_name, event_start, event_end").limit(1).execute().data or [{}]
+    )[0])
 
 
 @app.get("/api/players")
@@ -71,61 +84,64 @@ def get_tiles():
 
 @app.get("/api/completions")
 def get_completions():
-    result = (
+    return cached("completions", lambda: (
         supabase.table("tile_completions")
         .select("id, tile_id, player_id, team_id, status, source, image_url, submitted_at, players(username), tiles(title, points), teams(name)")
         .execute()
-    )
-    return result.data
+        .data
+    ))
 
 
 @app.get("/api/leaderboard/teams")
 def team_leaderboard():
-    teams = supabase.table("teams").select("id, name, color").execute().data
-    completions = (
-        supabase.table("tile_completions")
-        .select("team_id, tiles(points)")
-        .eq("status", "approved")
-        .execute()
-        .data
-    )
-    scores: dict[str, int] = {}
-    for c in completions:
-        tid = c["team_id"]
-        scores[tid] = scores.get(tid, 0) + (c["tiles"]["points"] if c["tiles"] else 0)
-
-    return sorted(
-        [{"id": t["id"], "name": t["name"], "color": t["color"], "points": scores.get(t["id"], 0)} for t in teams],
-        key=lambda x: x["points"],
-        reverse=True,
-    )
+    def _compute():
+        teams = supabase.table("teams").select("id, name, color").execute().data
+        completions = (
+            supabase.table("tile_completions")
+            .select("team_id, tiles(points)")
+            .eq("status", "approved")
+            .execute()
+            .data
+        )
+        scores: dict[str, int] = {}
+        for c in completions:
+            tid = c["team_id"]
+            scores[tid] = scores.get(tid, 0) + (c["tiles"]["points"] if c["tiles"] else 0)
+        return sorted(
+            [{"id": t["id"], "name": t["name"], "color": t["color"], "points": scores.get(t["id"], 0)} for t in teams],
+            key=lambda x: x["points"],
+            reverse=True,
+        )
+    return cached("leaderboard_teams", _compute)
 
 
 @app.get("/api/leaderboard/players")
 def player_leaderboard():
-    players = supabase.table("players").select("id, username, team_id, teams(name, color)").execute().data
-    completions = (
-        supabase.table("tile_completions")
-        .select("player_id, tiles(points)")
-        .eq("status", "approved")
-        .execute()
-        .data
-    )
-    scores: dict[str, int] = {}
-    for c in completions:
-        pid = c["player_id"]
-        scores[pid] = scores.get(pid, 0) + (c["tiles"]["points"] if c["tiles"] else 0)
+    def _compute():
+        players = supabase.table("players").select("id, username, team_id, teams(name, color)").execute().data
+        completions = (
+            supabase.table("tile_completions")
+            .select("player_id, tiles(points)")
+            .eq("status", "approved")
+            .execute()
+            .data
+        )
+        scores: dict[str, int] = {}
+        for c in completions:
+            pid = c["player_id"]
+            scores[pid] = scores.get(pid, 0) + (c["tiles"]["points"] if c["tiles"] else 0)
 
-    def team_obj(p):
-        tid = p.get("team_id")
-        t = p.get("teams")
-        return {"id": tid, **(t or {})} if tid and t else None
+        def team_obj(p):
+            tid = p.get("team_id")
+            t = p.get("teams")
+            return {"id": tid, **(t or {})} if tid and t else None
 
-    return sorted(
-        [{"id": p["id"], "username": p["username"], "team": team_obj(p), "points": scores.get(p["id"], 0)} for p in players],
-        key=lambda x: x["points"],
-        reverse=True,
-    )
+        return sorted(
+            [{"id": p["id"], "username": p["username"], "team": team_obj(p), "points": scores.get(p["id"], 0)} for p in players],
+            key=lambda x: x["points"],
+            reverse=True,
+        )
+    return cached("leaderboard_players", _compute)
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +280,9 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
             "source": "dink",
             "image_url": image_url,
         }).execute()
+        _cache.pop("completions", None)
+        _cache.pop("leaderboard_teams", None)
+        _cache.pop("leaderboard_players", None)
         completed.append(tile["title"])
 
     return {"status": "ok", "completed": completed}
@@ -407,6 +426,9 @@ def review_completion(completion_id: str, status: str, admin=Depends(verify_admi
     if status not in ("approved", "rejected"):
         raise HTTPException(status_code=400, detail="status must be 'approved' or 'rejected'")
     result = supabase.table("tile_completions").update({"status": status}).eq("id", completion_id).execute()
+    _cache.pop("completions", None)
+    _cache.pop("leaderboard_teams", None)
+    _cache.pop("leaderboard_players", None)
     return result.data[0]
 
 
