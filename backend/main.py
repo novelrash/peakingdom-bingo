@@ -257,6 +257,8 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
         .execute()
     )
 
+    print(f"[dink] tiles_with_triggers={len(tiles.data)}", flush=True)
+
     completed = []
     for tile in tiles.data:
         match = _match_trigger(tile["trigger_data"], event_type, extra)
