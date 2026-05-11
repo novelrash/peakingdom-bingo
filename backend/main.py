@@ -99,7 +99,7 @@ def get_tiles():
 def get_completions():
     return cached("completions", lambda: (
         supabase.table("tile_completions")
-        .select("id, tile_id, player_id, team_id, status, source, image_url, submitted_at, players(username), tiles(title, points), teams(name)")
+        .select("id, tile_id, player_id, team_id, status, source, image_url, submitted_at, players(username), tiles(title, points, trigger_data), teams(name)")
         .execute()
         .data
     ))

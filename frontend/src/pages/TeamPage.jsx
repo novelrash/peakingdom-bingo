@@ -186,11 +186,20 @@ export default function TeamPage() {
                   key={c.id}
                   className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-lg px-3 py-2.5"
                 >
-                  {c.image_url && (
+                  {c.tiles?.trigger_data?.item_id ? (
+                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center">
+                      <img
+                        src={`https://static.runelite.net/cache/item/icon/${c.tiles.trigger_data.item_id}.png`}
+                        alt=""
+                        className="w-8 h-8 object-contain"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                    </div>
+                  ) : c.image_url ? (
                     <a href={c.image_url} target="_blank" rel="noreferrer" className="flex-shrink-0">
                       <img src={c.image_url} className="w-10 h-10 rounded object-cover hover:opacity-80 transition-opacity" />
                     </a>
-                  )}
+                  ) : null}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white/90 truncate">{c.tiles?.title}</p>
                     {!selectedPlayerId && (
