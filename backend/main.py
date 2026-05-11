@@ -248,11 +248,12 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
     player_id = player_result.data[0]["id"]
     team_id = player_result.data[0]["team_id"]
 
-    # Check all tiles that have triggers defined
+    # Check all enabled tiles that have triggers defined
     tiles = (
         supabase.table("tiles")
         .select("id, title, trigger_data")
         .not_.is_("trigger_data", "null")
+        .neq("disabled", True)
         .execute()
     )
 
@@ -390,6 +391,21 @@ class TileCreate(BaseModel):
     grid_position: Optional[int] = None
     category: Optional[str] = None
     trigger_data: Optional[dict] = None
+    disabled: Optional[bool] = None
+
+
+class TilePatch(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    points: Optional[int] = None
+    grid_position: Optional[int] = None
+    category: Optional[str] = None
+    trigger_data: Optional[dict] = None
+    disabled: Optional[bool] = None
+
+
+class BulkDeleteTiles(BaseModel):
+    ids: list[str]
 
 
 @app.post("/api/admin/tiles", status_code=201)
@@ -399,14 +415,29 @@ def create_tile(tile: TileCreate, admin=Depends(verify_admin)):
 
 
 @app.patch("/api/admin/tiles/{tile_id}")
-def update_tile(tile_id: str, tile: TileCreate, admin=Depends(verify_admin)):
-    result = supabase.table("tiles").update(tile.model_dump()).eq("id", tile_id).execute()
+def update_tile(tile_id: str, tile: TilePatch, admin=Depends(verify_admin)):
+    data = {k: v for k, v in tile.model_dump().items() if v is not None or k == 'disabled'}
+    result = supabase.table("tiles").update(data).eq("id", tile_id).execute()
     return result.data[0]
 
 
 @app.delete("/api/admin/tiles/{tile_id}", status_code=204)
 def delete_tile(tile_id: str, admin=Depends(verify_admin)):
     supabase.table("tiles").delete().eq("id", tile_id).execute()
+
+
+@app.post("/api/admin/tiles/bulk-delete", status_code=204)
+def bulk_delete_tiles(body: BulkDeleteTiles, admin=Depends(verify_admin)):
+    if body.ids:
+        supabase.table("tiles").delete().in_("id", body.ids).execute()
+
+
+@app.delete("/api/admin/completions/reset", status_code=204)
+def reset_completions(admin=Depends(verify_admin)):
+    supabase.table("tile_completions").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+    _cache.pop("completions", None)
+    _cache.pop("leaderboard_teams", None)
+    _cache.pop("leaderboard_players", None)
 
 
 @app.get("/api/admin/completions")

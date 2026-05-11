@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [newPlayer, setNewPlayer] = useState({ username: '', team_id: '' })
   const [newTile, setNewTile] = useState({ title: '', description: '', points: 1, grid_position: '' })
   const [editingTile, setEditingTile] = useState(null)
+  const [selectedTiles, setSelectedTiles] = useState(new Set())
+  const [resetting, setResetting] = useState(false)
   const [editSettings, setEditSettings] = useState({ event_name: '', event_start: '', event_end: '' })
   const [dinkConfigRaw, setDinkConfigRaw] = useState('')
   const [dinkConfigError, setDinkConfigError] = useState('')
@@ -99,6 +101,41 @@ export default function Dashboard() {
     if (!confirm('Delete this tile?')) return
     await api(`/api/admin/tiles/${id}`, 'DELETE')
     load()
+  }
+
+  async function bulkDeleteTiles() {
+    if (!selectedTiles.size) return
+    if (!confirm(`Delete ${selectedTiles.size} tile(s)? This cannot be undone.`)) return
+    await api('/api/admin/tiles/bulk-delete', 'POST', { ids: [...selectedTiles] })
+    setSelectedTiles(new Set())
+    load()
+  }
+
+  async function toggleTileDisabled(tile) {
+    await api(`/api/admin/tiles/${tile.id}`, 'PATCH', { disabled: !tile.disabled })
+    load()
+  }
+
+  async function resetCompletions() {
+    if (!confirm('Delete ALL tile completions? This will wipe scores for everyone and cannot be undone.')) return
+    setResetting(true)
+    await api('/api/admin/completions/reset', 'DELETE')
+    setResetting(false)
+    load()
+  }
+
+  function toggleSelectTile(id) {
+    setSelectedTiles(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedTiles(prev =>
+      prev.size === tiles.length ? new Set() : new Set(tiles.map(t => t.id))
+    )
   }
 
   function openEdit(tile) {
@@ -401,7 +438,7 @@ export default function Dashboard() {
 
           {/* --- Tiles tab --- */}
           {tab === 'tiles' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <details className="bg-white/5 border border-white/10 rounded-lg">
                 <summary className="px-4 py-3 font-medium cursor-pointer text-sm select-none text-white/80">
                   + Add new tile
@@ -452,20 +489,78 @@ export default function Dashboard() {
                 </form>
               </details>
 
+              {/* Bulk actions bar */}
+              <div className="flex items-center gap-3 px-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-white/50 hover:text-white/70 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedTiles.size === tiles.length && tiles.length > 0}
+                    onChange={toggleSelectAll}
+                    className="accent-violet-500 w-4 h-4"
+                  />
+                  {selectedTiles.size > 0 ? `${selectedTiles.size} selected` : 'Select all'}
+                </label>
+
+                {selectedTiles.size > 0 && (
+                  <button
+                    onClick={bulkDeleteTiles}
+                    className="px-3 py-1 rounded text-sm bg-red-900/40 border border-red-500/30 text-red-400 hover:bg-red-900/60 transition-colors"
+                  >
+                    Delete {selectedTiles.size}
+                  </button>
+                )}
+
+                <button
+                  onClick={resetCompletions}
+                  disabled={resetting}
+                  className="ml-auto px-3 py-1 rounded text-sm border border-white/10 text-white/40 hover:text-red-400 hover:border-red-500/30 transition-colors disabled:opacity-40"
+                >
+                  {resetting ? 'Resetting…' : 'Reset all completions'}
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {tiles.map(tile => (
-                  <div key={tile.id} className="bg-white/5 border border-white/10 rounded-lg p-3 relative group hover:border-white/20 transition-colors">
-                    <p className="font-medium text-sm pr-5 text-white/90">{tile.title}</p>
-                    <p className="text-xs text-white/40 mt-0.5">
+                  <div
+                    key={tile.id}
+                    className={`border rounded-lg p-3 relative group transition-colors ${
+                      selectedTiles.has(tile.id)
+                        ? 'bg-violet-900/20 border-violet-500/40'
+                        : tile.disabled
+                          ? 'bg-white/3 border-white/5 opacity-50'
+                          : 'bg-white/5 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedTiles.has(tile.id)}
+                      onChange={() => toggleSelectTile(tile.id)}
+                      className="absolute top-2.5 left-2.5 accent-violet-500 w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ opacity: selectedTiles.has(tile.id) ? 1 : undefined }}
+                    />
+
+                    <p className={`font-medium text-sm pr-14 pl-1 ${tile.disabled ? 'line-through text-white/40' : 'text-white/90'}`}>
+                      {tile.title}
+                    </p>
+                    <p className="text-xs text-white/40 mt-0.5 pl-1">
                       {tile.points} pts
                       {tile.category && ` · ${tile.category}`}
                       {tile.grid_position != null && ` · pos ${tile.grid_position}`}
                       {tile.trigger_data && <span className="ml-1 text-osrs-gold" title="Has Dink trigger">⚡</span>}
                     </p>
                     {tile.description && (
-                      <p className="text-xs text-white/30 mt-1 line-clamp-2">{tile.description}</p>
+                      <p className="text-xs text-white/30 mt-1 line-clamp-2 pl-1">{tile.description}</p>
                     )}
+
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => toggleTileDisabled(tile)}
+                        className={`text-xs px-1 transition-colors ${tile.disabled ? 'text-green-400 hover:text-green-300' : 'text-white/40 hover:text-yellow-400'}`}
+                        title={tile.disabled ? 'Enable tile' : 'Disable tile'}
+                      >
+                        {tile.disabled ? '▶' : '⏸'}
+                      </button>
                       <button
                         onClick={() => openEdit(tile)}
                         className="text-white/40 hover:text-osrs-gold text-xs px-1 transition-colors"
