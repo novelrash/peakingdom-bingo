@@ -292,14 +292,18 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
         if existing.data:
             continue
 
-        supabase.table("tile_completions").insert({
-            "tile_id": tile["id"],
-            "player_id": player_id,
-            "team_id": team_id,
-            "status": "approved",
-            "source": "dink",
-            "image_url": image_url,
-        }).execute()
+        try:
+            supabase.table("tile_completions").insert({
+                "tile_id": tile["id"],
+                "player_id": player_id,
+                "team_id": team_id,
+                "status": "approved",
+                "source": "dink",
+                "image_url": image_url,
+            }).execute()
+        except Exception:
+            # Unique constraint violation — another request beat us to it
+            continue
         _cache.pop("completions", None)
         _cache.pop("leaderboard_teams", None)
         _cache.pop("leaderboard_players", None)

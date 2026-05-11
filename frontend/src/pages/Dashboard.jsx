@@ -199,6 +199,31 @@ async function api(path, method = 'GET', body) {
   return res.json()
 }
 
+// OSRS item ID lookup — fetched once from the GE prices wiki and cached for the session
+let _osrsMapping = null
+let _osrsMappingInflight = null
+
+async function getOsrsMapping() {
+  if (_osrsMapping) return _osrsMapping
+  if (_osrsMappingInflight) return _osrsMappingInflight
+  _osrsMappingInflight = fetch('https://prices.runescape.wiki/api/v1/osrs/mapping', {
+    headers: { 'User-Agent': 'Pea Kingdom Bingo' },
+  })
+    .then(r => r.json())
+    .then(data => { _osrsMapping = data; _osrsMappingInflight = null; return data })
+    .catch(() => { _osrsMappingInflight = null; return [] })
+  return _osrsMappingInflight
+}
+
+async function lookupItemId(name) {
+  if (!name?.trim()) return null
+  try {
+    const mapping = await getOsrsMapping()
+    const lower = name.trim().toLowerCase()
+    return mapping.find(i => i.name.toLowerCase() === lower)?.id ?? null
+  } catch { return null }
+}
+
 const inputCls = 'bg-surface-overlay border border-white/10 text-white rounded px-3 py-2 w-full focus:outline-none focus:border-osrs-gold/40 placeholder:text-white/30'
 const labelCls = 'block text-xs text-white/50 mb-1'
 
@@ -274,11 +299,16 @@ export default function Dashboard() {
 
   async function addTile(e) {
     e.preventDefault()
+    const trigger = buildTrigger(newTriggerType, newTriggerCfg, newTile.title)
+    if (trigger?.type === 'LOOT') {
+      const id = await lookupItemId(trigger.item || trigger.item_contains)
+      if (id != null) trigger.item_id = id
+    }
     const payload = {
       title: newTile.title,
       description: newTile.description || null,
       points: Number(newTile.points),
-      trigger_data: buildTrigger(newTriggerType, newTriggerCfg, newTile.title),
+      trigger_data: trigger,
     }
     await api('/api/admin/tiles', 'POST', payload)
     setNewTile({ title: '', description: '', points: 1 })
@@ -346,11 +376,16 @@ export default function Dashboard() {
 
   async function saveEditedTile(e) {
     e.preventDefault()
+    const trigger = buildTrigger(editTriggerType, editTriggerCfg, editingTile.title)
+    if (trigger?.type === 'LOOT') {
+      const id = await lookupItemId(trigger.item || trigger.item_contains)
+      if (id != null) trigger.item_id = id
+    }
     await api(`/api/admin/tiles/${editingTile.id}`, 'PATCH', {
       title: editingTile.title,
       description: editingTile.description || null,
       points: Number(editingTile.points),
-      trigger_data: buildTrigger(editTriggerType, editTriggerCfg, editingTile.title),
+      trigger_data: trigger,
       category: editingTile.category || null,
     })
     setEditingTile(null)

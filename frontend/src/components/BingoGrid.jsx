@@ -16,7 +16,7 @@ export default function BingoGrid({ tiles, completions, playerId, onSubmit }) {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-1.5">
       {tiles.map(tile => {
         const completion = byTile[tile.id]
         const status = completion?.status ?? 'none'
@@ -30,31 +30,49 @@ export default function BingoGrid({ tiles, completions, playerId, onSubmit }) {
             onClick={() => isAvailable && onSubmit(tile)}
             disabled={!isAvailable}
             className={[
-              'relative border-2 rounded-lg p-2 text-left transition-all duration-150',
+              'relative aspect-square border-2 rounded-lg overflow-hidden text-left transition-all duration-150',
               tierBorderClass(tile.points, status),
-              isDone    && 'bg-green-900/20 opacity-60 cursor-not-allowed',
-              isPending && 'bg-osrs-gold/5 cursor-not-allowed',
-              isAvailable  && 'bg-white/5 hover:bg-white/10 cursor-pointer',
+              isDone      && 'bg-green-900/20 opacity-60 cursor-not-allowed',
+              isPending   && 'bg-osrs-gold/5 cursor-not-allowed',
+              isAvailable && 'bg-white/5 hover:bg-white/10 cursor-pointer',
               (!isAvailable && !isDone && !isPending) && 'bg-white/5 cursor-default',
             ].filter(Boolean).join(' ')}
           >
-            <p className={`text-xs font-semibold leading-tight line-clamp-3 ${isDone ? 'line-through text-white/30' : 'text-white/90'}`}>
-              {tile.title}
-            </p>
-            <div className={`flex items-center gap-1 mt-1 ${isDone ? 'text-white/25' : 'text-white/40'}`}>
-              <span className="text-xs">{tile.points} pts</span>
-              {tile.trigger_data && (
-                <span className="text-sky-400 text-xs leading-none" title="Auto-completes via Dink">⚡</span>
-              )}
+            {/* Centered item icon */}
+            {tile.trigger_data?.item_id && (
+              <img
+                src={`https://static.runelite.net/cache/item/icon/${tile.trigger_data.item_id}.png`}
+                alt=""
+                className={`absolute inset-0 m-auto w-10 h-10 object-contain pointer-events-none select-none transition-opacity ${isDone ? 'opacity-20' : 'opacity-55'}`}
+                style={{ imageRendering: 'pixelated' }}
+              />
+            )}
+
+            {/* Bottom gradient overlay with title + points */}
+            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 pt-6 pb-1.5">
+              <p className={`text-xs font-semibold leading-tight line-clamp-2 ${isDone ? 'line-through text-white/30' : 'text-white/90'}`}>
+                {tile.title}
+              </p>
+              <div className={`flex items-center gap-1 mt-0.5 ${isDone ? 'text-white/25' : 'text-white/40'}`}>
+                <span className="text-xs">{tile.points} pts</span>
+                {tile.trigger_data && (
+                  <span className="text-sky-400 text-xs leading-none" title="Auto-completes via Dink">⚡</span>
+                )}
+              </div>
             </div>
 
+            {/* Completed checkmark */}
             {isDone && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-green-900/10">
-                <span className="text-green-400 text-lg font-bold">✓</span>
+              <div className="absolute inset-0 flex items-center justify-center bg-green-900/10">
+                <span className="text-green-400 text-2xl font-bold">✓</span>
               </div>
             )}
+
+            {/* Pending badge */}
             {isPending && (
-              <p className="text-xs font-semibold text-osrs-gold mt-1">⏳ Pending</p>
+              <div className="absolute top-1.5 left-1.5">
+                <span className="text-osrs-gold text-xs">⏳</span>
+              </div>
             )}
           </button>
         )
