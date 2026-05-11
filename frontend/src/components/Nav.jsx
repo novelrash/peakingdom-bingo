@@ -77,20 +77,20 @@ export default function Nav({ eventName }) {
       <div className="max-w-6xl mx-auto px-4">
 
         {/* Main bar */}
-        <div className="h-14 flex items-center justify-between gap-3">
+        <div className="h-14 flex items-center justify-between gap-3 md:grid md:grid-cols-[1fr_auto_1fr]">
 
-          {/* Brand — visible on mobile, hidden on md+ where nav links take center */}
-          <span className="md:hidden font-cinzel text-osrs-gold font-bold text-sm truncate flex-1 min-w-0">
+          {/* Brand */}
+          <span className="font-cinzel text-osrs-gold font-bold text-sm truncate min-w-0">
             {displayName}
           </span>
 
-          {/* Desktop nav links — centered */}
-          <div className="hidden md:flex flex-1 items-center justify-center gap-1">
+          {/* Nav links — centered on desktop, hidden on mobile */}
+          <div className="hidden md:flex items-center gap-1">
             {navLinks}
           </div>
 
           {/* Player selector */}
-          <div ref={containerRef} className="relative flex items-center gap-2 text-sm flex-shrink-0">
+          <div ref={containerRef} className="relative flex items-center gap-2 text-sm flex-shrink-0 justify-end">
             {playerName ? (
               <>
                 <Link
