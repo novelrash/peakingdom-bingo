@@ -41,9 +41,12 @@ export default function BingoGrid({ tiles, completions, playerId, onSubmit }) {
             <p className={`text-xs font-semibold leading-tight line-clamp-3 ${isDone ? 'line-through text-white/30' : 'text-white/90'}`}>
               {tile.title}
             </p>
-            <p className={`text-xs mt-1 ${isDone ? 'text-white/25' : 'text-white/40'}`}>
-              {tile.points} pts
-            </p>
+            <div className={`flex items-center gap-1 mt-1 ${isDone ? 'text-white/25' : 'text-white/40'}`}>
+              <span className="text-xs">{tile.points} pts</span>
+              {tile.trigger_data && (
+                <span className="text-sky-400 text-xs leading-none" title="Auto-completes via Dink">⚡</span>
+              )}
+            </div>
 
             {isDone && (
               <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-green-900/10">

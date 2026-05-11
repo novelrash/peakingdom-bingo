@@ -37,6 +37,23 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [teamPage, setTeamPage] = useState(0)
   const [playerPage, setPlayerPage] = useState(0)
+  const [expandedTeams, setExpandedTeams] = useState(new Set())
+
+  function toggleTeam(id) {
+    setExpandedTeams(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const playersByTeam = {}
+  for (const p of players) {
+    if (p.team?.id) {
+      if (!playersByTeam[p.team.id]) playersByTeam[p.team.id] = []
+      playersByTeam[p.team.id].push(p)
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -81,20 +98,47 @@ export default function LeaderboardPage() {
                     const rank = teamPage * PAGE_SIZE + i
                     const ranked = rank < 3
                     const rs = RANK_STYLES[rank] ?? null
+                    const isExpanded = expandedTeams.has(team.id)
+                    const members = (playersByTeam[team.id] || []).slice().sort((a, b) => b.points - a.points)
                     return (
-                      <li key={team.id}>
-                        <Link
-                          to={`/team/${team.id}`}
-                          className={[
-                            'flex items-center gap-3 border-l-4 px-4 transition-all group',
-                            ranked ? `${rs.border} ${rs.bg} py-3 hover:brightness-110` : 'border-l-white/10 py-2.5 hover:bg-white/4',
-                          ].join(' ')}
-                        >
-                          <span className={`font-cinzel font-bold flex-shrink-0 ${ranked ? `text-lg ${rs.num}` : 'text-sm text-white/30'}`}>{rank + 1}</span>
-                          <span className={`flex-1 font-semibold group-hover:underline underline-offset-2 ${ranked ? 'text-base text-white' : 'text-sm text-white/80'}`}>{team.name}</span>
-                          <span className={`font-bold ${ranked ? `text-base ${rs.text}` : 'text-sm text-osrs-gold/80'}`}>{team.points} pts</span>
-                          <span className="text-white/30 text-sm group-hover:text-white/60 group-hover:translate-x-0.5 transition-all">→</span>
-                        </Link>
+                      <li key={team.id} className="divide-y divide-white/5">
+                        <div className="flex items-center">
+                          <Link
+                            to={`/team/${team.id}`}
+                            className={[
+                              'flex flex-1 items-center gap-3 border-l-4 px-4 transition-all group',
+                              ranked ? `${rs.border} ${rs.bg} py-3 hover:brightness-110` : 'border-l-white/10 py-2.5 hover:bg-white/4',
+                            ].join(' ')}
+                          >
+                            <span className={`font-cinzel font-bold flex-shrink-0 ${ranked ? `text-lg ${rs.num}` : 'text-sm text-white/30'}`}>{rank + 1}</span>
+                            <span className={`flex-1 font-semibold group-hover:underline underline-offset-2 ${ranked ? 'text-base text-white' : 'text-sm text-white/80'}`}>{team.name}</span>
+                            <span className={`font-bold ${ranked ? `text-base ${rs.text}` : 'text-sm text-osrs-gold/80'}`}>{team.points} pts</span>
+                          </Link>
+                          <button
+                            onClick={() => toggleTeam(team.id)}
+                            className="px-3 self-stretch flex items-center text-white/30 hover:text-white/70 transition-colors border-l border-white/5"
+                          >
+                            <span className={`text-base leading-none transition-transform duration-150 inline-block ${isExpanded ? 'rotate-180' : ''}`}>▾</span>
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div className="bg-black/20 divide-y divide-white/5">
+                            {members.length === 0
+                              ? <p className="text-xs text-white/30 px-4 py-2 text-center">No members</p>
+                              : members.map(m => (
+                                <Link
+                                  key={m.id}
+                                  to={`/team/${team.id}`}
+                                  state={{ playerId: m.id }}
+                                  className="flex items-center justify-between px-6 py-2 hover:bg-white/5 transition-colors group"
+                                >
+                                  <span className="text-sm text-white/65 group-hover:text-white/90 transition-colors">{m.username}</span>
+                                  <span className="text-sm font-medium text-osrs-gold/60">{m.points} pts</span>
+                                </Link>
+                              ))
+                            }
+                          </div>
+                        )}
                       </li>
                     )
                   })}

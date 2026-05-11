@@ -526,7 +526,10 @@ def get_admin_settings(admin=Depends(verify_admin)):
 @app.patch("/api/admin/settings")
 def update_settings(settings: EventSettings, admin=Depends(verify_admin)):
     existing = supabase.table("event_settings").select("id").limit(1).execute()
-    data = {k: v for k, v in settings.model_dump().items() if v is not None}
+    dumped = settings.model_dump()
+    # Always write date fields (allows clearing them), skip other None fields
+    nullable_fields = {"event_start", "event_end"}
+    data = {k: v for k, v in dumped.items() if v is not None or k in nullable_fields}
     if existing.data:
         result = supabase.table("event_settings").update(data).eq("id", existing.data[0]["id"]).execute()
     else:
