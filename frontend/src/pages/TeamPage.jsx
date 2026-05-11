@@ -30,7 +30,8 @@ export default function TeamPage() {
       fetch(`${API}/api/players`).then(r => r.json()),
       fetch(`${API}/api/completions`).then(r => r.json()),
     ]).then(([teams, players, allCompletions]) => {
-      const teamInfo = teams.find(t => t.id === teamId) || null
+      const teamIndex = teams.findIndex(t => t.id === teamId)
+      const teamInfo = teamIndex >= 0 ? { ...teams[teamIndex], rank: teamIndex + 1 } : null
       setTeam(teamInfo)
 
       const teamPlayers = players.filter(p => p.team_id === teamId)
@@ -97,7 +98,12 @@ export default function TeamPage() {
           />
           <div className="relative flex items-center gap-5">
             <div className="flex-1 min-w-0">
-              <h1 className="text-3xl font-cinzel font-bold text-white truncate">{team.name}</h1>
+              <h1 className="text-3xl font-cinzel font-bold text-white truncate">
+                {team.name}
+                {team.rank && (
+                  <span className="ml-3 text-lg font-cinzel text-osrs-gold/60">#{team.rank}</span>
+                )}
+              </h1>
               <p className="text-white/45 text-sm mt-1">
                 <span className="text-osrs-gold font-bold">{team.points} pts</span>
                 {' · '}
@@ -178,8 +184,13 @@ export default function TeamPage() {
               {visibleCompletions.map(c => (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-lg px-4 py-3"
+                  className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-lg px-3 py-2.5"
                 >
+                  {c.image_url && (
+                    <a href={c.image_url} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                      <img src={c.image_url} className="w-10 h-10 rounded object-cover hover:opacity-80 transition-opacity" />
+                    </a>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white/90 truncate">{c.tiles?.title}</p>
                     {!selectedPlayerId && (
