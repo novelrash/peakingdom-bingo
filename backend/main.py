@@ -229,7 +229,7 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
     event_type = payload.get("type", "")
     extra = payload.get("extra", {})
 
-    print(f"[dink] player={player_name!r} type={event_type!r}", flush=True)
+    print(f"[dink] player={player_name!r} type={event_type!r} extra={json.dumps(extra)}", flush=True)
 
     if not player_name or not event_type:
         return {"status": "ignored", "reason": "missing playerName or type"}
@@ -259,7 +259,9 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
 
     completed = []
     for tile in tiles.data:
-        if not _match_trigger(tile["trigger_data"], event_type, extra):
+        match = _match_trigger(tile["trigger_data"], event_type, extra)
+        print(f"[dink] tile={tile['title']!r} match={match}", flush=True)
+        if not match:
             continue
 
         # Skip if this team already has a completion (any status) for this tile
