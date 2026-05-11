@@ -6,7 +6,6 @@ const API = import.meta.env.VITE_API_URL || ''
 const EVENT_NAME_KEY = 'osrs_bingo_event_name'
 
 export default function Nav({ eventName }) {
-  const displayName = eventName || localStorage.getItem(EVENT_NAME_KEY) || 'OSRS Bingo'
   if (eventName) localStorage.setItem(EVENT_NAME_KEY, eventName)
 
   const { playerId, playerName, playerTeam, selectPlayer } = usePlayer()
@@ -79,10 +78,7 @@ export default function Nav({ eventName }) {
         {/* Main bar */}
         <div className="h-14 flex items-center justify-between gap-3 md:grid md:grid-cols-[1fr_auto_1fr]">
 
-          {/* Brand */}
-          <span className="font-cinzel text-osrs-gold font-bold text-sm truncate min-w-0">
-            {displayName}
-          </span>
+          <div />
 
           {/* Nav links — centered on desktop, hidden on mobile */}
           <div className="hidden md:flex items-center gap-1">
