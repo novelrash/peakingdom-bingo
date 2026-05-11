@@ -19,19 +19,22 @@ const SKILLS = ['Attack','Strength','Defence','Hitpoints','Ranged','Prayer','Mag
   'Cooking','Woodcutting','Fletching','Fishing','Firemaking','Crafting','Smithing',
   'Mining','Herblore','Agility','Thieving','Slayer','Farming','Runecraft','Hunter','Construction']
 
-function buildTrigger(type, cfg) {
+function buildTrigger(type, cfg, tileTitle = '') {
   if (!type) return null
+  const item  = cfg.useTitle ? tileTitle : (cfg.item  || '')
+  const boss  = cfg.useTitle ? tileTitle : (cfg.boss  || '')
+  const quest = cfg.useTitle ? tileTitle : (cfg.quest || '')
+  const pet   = cfg.useTitle ? tileTitle : (cfg.pet   || '')
+  const task  = cfg.useTitle ? tileTitle : (cfg.task  || '')
   switch (type) {
     case 'LOOT':
-      return cfg.useContains
-        ? { type, item_contains: cfg.item || '' }
-        : { type, item: cfg.item || '' }
-    case 'COLLECTION':  return { type, item: cfg.item || '' }
-    case 'KILL_COUNT':  return { type, boss: cfg.boss || '', ...(cfg.min_count ? { min_count: Number(cfg.min_count) } : {}) }
-    case 'QUEST':       return { type, quest: cfg.quest || '' }
+      return cfg.useContains ? { type, item_contains: item } : { type, item }
+    case 'COLLECTION':  return { type, item }
+    case 'KILL_COUNT':  return { type, boss, ...(cfg.min_count ? { min_count: Number(cfg.min_count) } : {}) }
+    case 'QUEST':       return { type, quest }
     case 'LEVEL':       return { type, skill: cfg.skill || 'Attack', level: Number(cfg.level) || 99 }
-    case 'PET':         return cfg.pet ? { type, pet: cfg.pet } : { type }
-    case 'COMBAT_ACHIEVEMENT': return { type, task: cfg.task || '' }
+    case 'PET':         return pet ? { type, pet } : { type }
+    case 'COMBAT_ACHIEVEMENT': return { type, task }
     case 'DEATH':       return { type }
     default:            return null
   }
@@ -54,7 +57,24 @@ function parseTrigger(trigger) {
   return { type: type || '', cfg }
 }
 
-function TriggerBuilder({ type, cfg, setType, setCfg }) {
+function TriggerBuilder({ type, cfg, setType, setCfg, tileTitle = '' }) {
+  function SameTitleCheckbox({ field }) {
+    const checked = !!cfg.useTitle
+    return (
+      <label className="flex items-center gap-1.5 text-xs text-white/40 cursor-pointer select-none mt-1 w-fit">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={e => {
+            if (e.target.checked) setCfg(c => ({ ...c, [field]: tileTitle, useTitle: true }))
+            else setCfg(c => ({ ...c, useTitle: false }))
+          }}
+          className="accent-violet-500"
+        />
+        Same as title
+      </label>
+    )
+  }
   const inputCls = 'bg-surface-overlay border border-white/10 text-white rounded px-3 py-2 w-full focus:outline-none focus:border-osrs-gold/40 placeholder:text-white/30 text-sm'
   const labelCls = 'block text-xs text-white/50 mb-1'
   return (
@@ -80,7 +100,8 @@ function TriggerBuilder({ type, cfg, setType, setCfg }) {
         <div className="space-y-2">
           <div>
             <label className={labelCls}>Item name</label>
-            <input className={inputCls} placeholder="e.g. Twisted bow" value={cfg.item || ''} onChange={e => setCfg(c => ({ ...c, item: e.target.value }))} />
+            <input className={inputCls} placeholder="e.g. Twisted bow" value={cfg.useTitle ? tileTitle : (cfg.item || '')} disabled={!!cfg.useTitle} onChange={e => setCfg(c => ({ ...c, item: e.target.value }))} />
+            <SameTitleCheckbox field="item" />
           </div>
           <label className="flex items-center gap-2 text-xs text-white/50 cursor-pointer select-none">
             <input type="checkbox" checked={!!cfg.useContains} onChange={e => setCfg(c => ({ ...c, useContains: e.target.checked }))} className="accent-violet-500" />
@@ -92,7 +113,8 @@ function TriggerBuilder({ type, cfg, setType, setCfg }) {
       {type === 'COLLECTION' && (
         <div>
           <label className={labelCls}>Item name</label>
-          <input className={inputCls} placeholder="e.g. Twisted bow" value={cfg.item || ''} onChange={e => setCfg(c => ({ ...c, item: e.target.value }))} />
+          <input className={inputCls} placeholder="e.g. Twisted bow" value={cfg.useTitle ? tileTitle : (cfg.item || '')} disabled={!!cfg.useTitle} onChange={e => setCfg(c => ({ ...c, item: e.target.value }))} />
+          <SameTitleCheckbox field="item" />
         </div>
       )}
 
@@ -100,7 +122,8 @@ function TriggerBuilder({ type, cfg, setType, setCfg }) {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className={labelCls}>Boss name</label>
-            <input className={inputCls} placeholder="e.g. Zulrah" value={cfg.boss || ''} onChange={e => setCfg(c => ({ ...c, boss: e.target.value }))} />
+            <input className={inputCls} placeholder="e.g. Zulrah" value={cfg.useTitle ? tileTitle : (cfg.boss || '')} disabled={!!cfg.useTitle} onChange={e => setCfg(c => ({ ...c, boss: e.target.value }))} />
+            <SameTitleCheckbox field="boss" />
           </div>
           <div>
             <label className={labelCls}>Min kills (optional)</label>
@@ -112,7 +135,8 @@ function TriggerBuilder({ type, cfg, setType, setCfg }) {
       {type === 'QUEST' && (
         <div>
           <label className={labelCls}>Quest name</label>
-          <input className={inputCls} placeholder="e.g. Dragon Slayer II" value={cfg.quest || ''} onChange={e => setCfg(c => ({ ...c, quest: e.target.value }))} />
+          <input className={inputCls} placeholder="e.g. Dragon Slayer II" value={cfg.useTitle ? tileTitle : (cfg.quest || '')} disabled={!!cfg.useTitle} onChange={e => setCfg(c => ({ ...c, quest: e.target.value }))} />
+          <SameTitleCheckbox field="quest" />
         </div>
       )}
 
@@ -134,14 +158,16 @@ function TriggerBuilder({ type, cfg, setType, setCfg }) {
       {type === 'PET' && (
         <div>
           <label className={labelCls}>Pet name (leave blank for any pet)</label>
-          <input className={inputCls} placeholder="e.g. Olmlet" value={cfg.pet || ''} onChange={e => setCfg(c => ({ ...c, pet: e.target.value }))} />
+          <input className={inputCls} placeholder="e.g. Olmlet" value={cfg.useTitle ? tileTitle : (cfg.pet || '')} disabled={!!cfg.useTitle} onChange={e => setCfg(c => ({ ...c, pet: e.target.value }))} />
+          <SameTitleCheckbox field="pet" />
         </div>
       )}
 
       {type === 'COMBAT_ACHIEVEMENT' && (
         <div>
           <label className={labelCls}>Task name (partial match)</label>
-          <input className={inputCls} placeholder="e.g. Verzik Speed-Runner" value={cfg.task || ''} onChange={e => setCfg(c => ({ ...c, task: e.target.value }))} />
+          <input className={inputCls} placeholder="e.g. Verzik Speed-Runner" value={cfg.useTitle ? tileTitle : (cfg.task || '')} disabled={!!cfg.useTitle} onChange={e => setCfg(c => ({ ...c, task: e.target.value }))} />
+          <SameTitleCheckbox field="task" />
         </div>
       )}
 
@@ -252,7 +278,7 @@ export default function Dashboard() {
       title: newTile.title,
       description: newTile.description || null,
       points: Number(newTile.points),
-      trigger_data: buildTrigger(newTriggerType, newTriggerCfg),
+      trigger_data: buildTrigger(newTriggerType, newTriggerCfg, newTile.title),
     }
     await api('/api/admin/tiles', 'POST', payload)
     setNewTile({ title: '', description: '', points: 1 })
@@ -324,7 +350,7 @@ export default function Dashboard() {
       title: editingTile.title,
       description: editingTile.description || null,
       points: Number(editingTile.points),
-      trigger_data: buildTrigger(editTriggerType, editTriggerCfg),
+      trigger_data: buildTrigger(editTriggerType, editTriggerCfg, editingTile.title),
       category: editingTile.category || null,
     })
     setEditingTile(null)
@@ -642,8 +668,9 @@ export default function Dashboard() {
                     <TriggerBuilder
                       type={newTriggerType}
                       cfg={newTriggerCfg}
-                      setType={setNewTriggerType}
+                      setType={t => { setNewTriggerType(t); setNewTriggerCfg({}) }}
                       setCfg={setNewTriggerCfg}
+                      tileTitle={newTile.title}
                     />
                   </div>
                   <button className="bg-osrs-gold text-surface-base font-bold px-4 py-2 rounded hover:bg-osrs-gold-bright transition-colors">
@@ -895,8 +922,9 @@ export default function Dashboard() {
                 <TriggerBuilder
                   type={editTriggerType}
                   cfg={editTriggerCfg}
-                  setType={setEditTriggerType}
+                  setType={t => { setEditTriggerType(t); setEditTriggerCfg({}) }}
                   setCfg={setEditTriggerCfg}
+                  tileTitle={editingTile.title}
                 />
               </div>
               <div className="flex gap-3 pt-1">
