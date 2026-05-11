@@ -3,6 +3,161 @@ import { supabase } from '../lib/supabase'
 
 const API = import.meta.env.VITE_API_URL || ''
 
+const TRIGGER_TYPES = [
+  { value: '',                 label: 'None (manual)' },
+  { value: 'LOOT',             label: 'Loot Drop' },
+  { value: 'COLLECTION',       label: 'Collection Log' },
+  { value: 'KILL_COUNT',       label: 'Kill Count' },
+  { value: 'QUEST',            label: 'Quest' },
+  { value: 'LEVEL',            label: 'Level Up' },
+  { value: 'PET',              label: 'Pet' },
+  { value: 'COMBAT_ACHIEVEMENT', label: 'Combat Task' },
+  { value: 'DEATH',            label: 'Death' },
+]
+
+const SKILLS = ['Attack','Strength','Defence','Hitpoints','Ranged','Prayer','Magic',
+  'Cooking','Woodcutting','Fletching','Fishing','Firemaking','Crafting','Smithing',
+  'Mining','Herblore','Agility','Thieving','Slayer','Farming','Runecraft','Hunter','Construction']
+
+function buildTrigger(type, cfg) {
+  if (!type) return null
+  switch (type) {
+    case 'LOOT':
+      return cfg.useContains
+        ? { type, item_contains: cfg.item || '' }
+        : { type, item: cfg.item || '' }
+    case 'COLLECTION':  return { type, item: cfg.item || '' }
+    case 'KILL_COUNT':  return { type, boss: cfg.boss || '', ...(cfg.min_count ? { min_count: Number(cfg.min_count) } : {}) }
+    case 'QUEST':       return { type, quest: cfg.quest || '' }
+    case 'LEVEL':       return { type, skill: cfg.skill || 'Attack', level: Number(cfg.level) || 99 }
+    case 'PET':         return cfg.pet ? { type, pet: cfg.pet } : { type }
+    case 'COMBAT_ACHIEVEMENT': return { type, task: cfg.task || '' }
+    case 'DEATH':       return { type }
+    default:            return null
+  }
+}
+
+function parseTrigger(trigger) {
+  if (!trigger) return { type: '', cfg: {} }
+  const { type, item, item_contains, boss, min_count, quest, skill, level, pet, task } = trigger
+  const cfg = {
+    item: item || item_contains || '',
+    useContains: !!item_contains,
+    boss: boss || '',
+    min_count: min_count || '',
+    quest: quest || '',
+    skill: skill || 'Attack',
+    level: level || 99,
+    pet: pet || '',
+    task: task || '',
+  }
+  return { type: type || '', cfg }
+}
+
+function TriggerBuilder({ type, cfg, setType, setCfg }) {
+  const inputCls = 'bg-surface-overlay border border-white/10 text-white rounded px-3 py-2 w-full focus:outline-none focus:border-osrs-gold/40 placeholder:text-white/30 text-sm'
+  const labelCls = 'block text-xs text-white/50 mb-1'
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {TRIGGER_TYPES.map(t => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setType(t.value)}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+              type === t.value
+                ? 'bg-osrs-gold text-surface-base'
+                : 'bg-white/5 border border-white/10 text-white/50 hover:text-white/80 hover:border-white/20'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {type === 'LOOT' && (
+        <div className="space-y-2">
+          <div>
+            <label className={labelCls}>Item name</label>
+            <input className={inputCls} placeholder="e.g. Twisted bow" value={cfg.item || ''} onChange={e => setCfg(c => ({ ...c, item: e.target.value }))} />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-white/50 cursor-pointer select-none">
+            <input type="checkbox" checked={!!cfg.useContains} onChange={e => setCfg(c => ({ ...c, useContains: e.target.checked }))} className="accent-violet-500" />
+            Use partial match (item name <em>contains</em> text above)
+          </label>
+        </div>
+      )}
+
+      {type === 'COLLECTION' && (
+        <div>
+          <label className={labelCls}>Item name</label>
+          <input className={inputCls} placeholder="e.g. Twisted bow" value={cfg.item || ''} onChange={e => setCfg(c => ({ ...c, item: e.target.value }))} />
+        </div>
+      )}
+
+      {type === 'KILL_COUNT' && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelCls}>Boss name</label>
+            <input className={inputCls} placeholder="e.g. Zulrah" value={cfg.boss || ''} onChange={e => setCfg(c => ({ ...c, boss: e.target.value }))} />
+          </div>
+          <div>
+            <label className={labelCls}>Min kills (optional)</label>
+            <input type="number" min={1} className={inputCls} placeholder="e.g. 100" value={cfg.min_count || ''} onChange={e => setCfg(c => ({ ...c, min_count: e.target.value }))} />
+          </div>
+        </div>
+      )}
+
+      {type === 'QUEST' && (
+        <div>
+          <label className={labelCls}>Quest name</label>
+          <input className={inputCls} placeholder="e.g. Dragon Slayer II" value={cfg.quest || ''} onChange={e => setCfg(c => ({ ...c, quest: e.target.value }))} />
+        </div>
+      )}
+
+      {type === 'LEVEL' && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelCls}>Skill</label>
+            <select className={inputCls} value={cfg.skill || 'Attack'} onChange={e => setCfg(c => ({ ...c, skill: e.target.value }))}>
+              {SKILLS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Level</label>
+            <input type="number" min={2} max={99} className={inputCls} value={cfg.level || 99} onChange={e => setCfg(c => ({ ...c, level: e.target.value }))} />
+          </div>
+        </div>
+      )}
+
+      {type === 'PET' && (
+        <div>
+          <label className={labelCls}>Pet name (leave blank for any pet)</label>
+          <input className={inputCls} placeholder="e.g. Olmlet" value={cfg.pet || ''} onChange={e => setCfg(c => ({ ...c, pet: e.target.value }))} />
+        </div>
+      )}
+
+      {type === 'COMBAT_ACHIEVEMENT' && (
+        <div>
+          <label className={labelCls}>Task name (partial match)</label>
+          <input className={inputCls} placeholder="e.g. Verzik Speed-Runner" value={cfg.task || ''} onChange={e => setCfg(c => ({ ...c, task: e.target.value }))} />
+        </div>
+      )}
+
+      {type === 'DEATH' && (
+        <p className="text-xs text-white/30">Triggers on any death event.</p>
+      )}
+
+      {type && (
+        <div className="font-mono text-xs text-white/30 bg-black/30 rounded px-3 py-2 break-all">
+          {JSON.stringify(buildTrigger(type, cfg))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 async function authHeader() {
   const { data } = await supabase.auth.getSession()
   return { Authorization: `Bearer ${data.session.access_token}` }
@@ -29,7 +184,9 @@ export default function Dashboard() {
   const [settings, setSettings] = useState({})
   const [newTeam, setNewTeam] = useState({ name: '', color: '#3b82f6' })
   const [newPlayer, setNewPlayer] = useState({ username: '', team_id: '' })
-  const [newTile, setNewTile] = useState({ title: '', description: '', points: 1, grid_position: '' })
+  const [newTile, setNewTile] = useState({ title: '', description: '', points: 1 })
+  const [newTriggerType, setNewTriggerType] = useState('')
+  const [newTriggerCfg, setNewTriggerCfg] = useState({})
   const [editingTile, setEditingTile] = useState(null)
   const [selectedTiles, setSelectedTiles] = useState(new Set())
   const [resetting, setResetting] = useState(false)
@@ -91,9 +248,16 @@ export default function Dashboard() {
 
   async function addTile(e) {
     e.preventDefault()
-    const payload = { ...newTile, grid_position: newTile.grid_position ? Number(newTile.grid_position) : null }
+    const payload = {
+      title: newTile.title,
+      description: newTile.description || null,
+      points: Number(newTile.points),
+      trigger_data: buildTrigger(newTriggerType, newTriggerCfg),
+    }
     await api('/api/admin/tiles', 'POST', payload)
-    setNewTile({ title: '', description: '', points: 1, grid_position: '' })
+    setNewTile({ title: '', description: '', points: 1 })
+    setNewTriggerType('')
+    setNewTriggerCfg({})
     load()
   }
 
@@ -138,31 +302,29 @@ export default function Dashboard() {
     )
   }
 
+  const [editTriggerType, setEditTriggerType] = useState('')
+  const [editTriggerCfg, setEditTriggerCfg] = useState({})
+
   function openEdit(tile) {
+    const { type, cfg } = parseTrigger(tile.trigger_data)
+    setEditTriggerType(type)
+    setEditTriggerCfg(cfg)
     setEditingTile({
       id: tile.id,
       title: tile.title,
       description: tile.description || '',
       points: tile.points,
-      grid_position: tile.grid_position ?? '',
-      trigger_data: tile.trigger_data ? JSON.stringify(tile.trigger_data, null, 2) : '',
       category: tile.category || '',
     })
   }
 
   async function saveEditedTile(e) {
     e.preventDefault()
-    let trigger_data = null
-    if (editingTile.trigger_data.trim()) {
-      try { trigger_data = JSON.parse(editingTile.trigger_data) }
-      catch { alert('Invalid JSON in trigger data'); return }
-    }
     await api(`/api/admin/tiles/${editingTile.id}`, 'PATCH', {
       title: editingTile.title,
       description: editingTile.description || null,
       points: Number(editingTile.points),
-      grid_position: editingTile.grid_position !== '' ? Number(editingTile.grid_position) : null,
-      trigger_data,
+      trigger_data: buildTrigger(editTriggerType, editTriggerCfg),
       category: editingTile.category || null,
     })
     setEditingTile(null)
@@ -443,44 +605,45 @@ export default function Dashboard() {
                 <summary className="px-4 py-3 font-medium cursor-pointer text-sm select-none text-white/80">
                   + Add new tile
                 </summary>
-                <form onSubmit={addTile} className="grid grid-cols-2 gap-3 items-end p-4 border-t border-white/10">
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className={labelCls}>Title</label>
-                    <input
-                      className={inputCls}
-                      placeholder="e.g. Kill Zulrah"
-                      value={newTile.title}
-                      onChange={e => setNewTile(t => ({ ...t, title: e.target.value }))}
-                      required
-                    />
+                <form onSubmit={addTile} className="space-y-3 p-4 border-t border-white/10">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className={labelCls}>Title</label>
+                      <input
+                        className={inputCls}
+                        placeholder="e.g. Kill Zulrah"
+                        value={newTile.title}
+                        onChange={e => setNewTile(t => ({ ...t, title: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Points</label>
+                      <input
+                        type="number" min={1}
+                        className={inputCls}
+                        value={newTile.points}
+                        onChange={e => setNewTile(t => ({ ...t, points: Number(e.target.value) }))}
+                        required
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelCls}>Description (optional)</label>
+                      <input
+                        className={inputCls}
+                        placeholder="Requirements or notes"
+                        value={newTile.description}
+                        onChange={e => setNewTile(t => ({ ...t, description: e.target.value }))}
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Points</label>
-                    <input
-                      type="number" min={1}
-                      className={inputCls}
-                      value={newTile.points}
-                      onChange={e => setNewTile(t => ({ ...t, points: Number(e.target.value) }))}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Grid position (optional)</label>
-                    <input
-                      type="number" min={0}
-                      className={inputCls}
-                      placeholder="0–24 for 5×5"
-                      value={newTile.grid_position}
-                      onChange={e => setNewTile(t => ({ ...t, grid_position: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={labelCls}>Description (optional)</label>
-                    <input
-                      className={inputCls}
-                      placeholder="Requirements or notes"
-                      value={newTile.description}
-                      onChange={e => setNewTile(t => ({ ...t, description: e.target.value }))}
+                    <label className={labelCls}>Dink trigger</label>
+                    <TriggerBuilder
+                      type={newTriggerType}
+                      cfg={newTriggerCfg}
+                      setType={setNewTriggerType}
+                      setCfg={setNewTriggerCfg}
                     />
                   </div>
                   <button className="bg-osrs-gold text-surface-base font-bold px-4 py-2 rounded hover:bg-osrs-gold-bright transition-colors">
@@ -728,15 +891,12 @@ export default function Dashboard() {
                 />
               </div>
               <div>
-                <label className={labelCls}>
-                  Dink trigger (JSON) <span className="text-white/25">— leave blank for manual only</span>
-                </label>
-                <textarea
-                  className={`${inputCls} font-mono text-xs`}
-                  rows={4}
-                  placeholder={'{"type":"LOOT","item":"Item name"}'}
-                  value={editingTile.trigger_data}
-                  onChange={e => setEditingTile(t => ({ ...t, trigger_data: e.target.value }))}
+                <label className={labelCls}>Dink trigger</label>
+                <TriggerBuilder
+                  type={editTriggerType}
+                  cfg={editTriggerCfg}
+                  setType={setEditTriggerType}
+                  setCfg={setEditTriggerCfg}
                 />
               </div>
               <div className="flex gap-3 pt-1">
