@@ -13,6 +13,19 @@ load_dotenv()
 
 app = FastAPI(title="OSRS Bingo API")
 
+from datetime import datetime, timezone
+
+def event_is_active() -> bool:
+    result = supabase.table("event_settings").select("event_start, event_end").limit(1).execute()
+    if not result.data:
+        return True
+    s = result.data[0]
+    start, end = s.get("event_start"), s.get("event_end")
+    if not start or not end:
+        return True
+    now = datetime.now(timezone.utc)
+    return datetime.fromisoformat(start).astimezone(timezone.utc) <= now <= datetime.fromisoformat(end).astimezone(timezone.utc)
+
 # Simple in-memory TTL cache for high-traffic read endpoints
 _cache: dict = {}
 CACHE_TTL = 15  # seconds
@@ -252,6 +265,9 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
     player_id = player_result.data[0]["id"]
     team_id = player_result.data[0]["team_id"]
 
+    if not event_is_active():
+        return {"status": "ignored", "reason": "event not active"}
+
     # Check all enabled tiles that have triggers defined
     all_tiles = supabase.table("tiles").select("id, title, trigger_data, disabled").execute()
     tiles_data = [t for t in all_tiles.data if t.get("trigger_data") and not t.get("disabled")]
@@ -304,6 +320,9 @@ class CompletionSubmit(BaseModel):
 
 @app.post("/api/completions", status_code=201)
 def submit_completion(payload: CompletionSubmit):
+    if not event_is_active():
+        raise HTTPException(status_code=403, detail="Event is not currently active")
+
     player = supabase.table("players").select("id, team_id").eq("id", payload.player_id).execute()
     if not player.data:
         raise HTTPException(status_code=404, detail="Player not found")
