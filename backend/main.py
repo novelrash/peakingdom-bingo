@@ -156,10 +156,14 @@ def _match_trigger(trigger: dict, event_type: str, extra: dict) -> bool:
     if event_type == "LOOT":
         items = extra.get("items", [])
         if "item" in trigger:
-            needle = trigger["item"].lower()
+            needle = trigger["item"].strip().lower()
+            if not needle:
+                return False
             return any(needle == item.get("name", "").lower() for item in items)
         if "item_contains" in trigger:
-            needle = trigger["item_contains"].lower()
+            needle = trigger["item_contains"].strip().lower()
+            if not needle:
+                return False
             return any(needle in item.get("name", "").lower() for item in items)
 
     if event_type == "PET":
@@ -249,18 +253,13 @@ async def dink_webhook(request: Request, x_dink_secret: Optional[str] = Header(N
     team_id = player_result.data[0]["team_id"]
 
     # Check all enabled tiles that have triggers defined
-    tiles = (
-        supabase.table("tiles")
-        .select("id, title, trigger_data")
-        .not_.is_("trigger_data", "null")
-        .neq("disabled", True)
-        .execute()
-    )
+    all_tiles = supabase.table("tiles").select("id, title, trigger_data, disabled").execute()
+    tiles_data = [t for t in all_tiles.data if t.get("trigger_data") and not t.get("disabled")]
 
-    print(f"[dink] tiles_with_triggers={len(tiles.data)}", flush=True)
+    print(f"[dink] tiles_total={len(all_tiles.data)} tiles_with_triggers={len(tiles_data)}", flush=True)
 
     completed = []
-    for tile in tiles.data:
+    for tile in tiles_data:
         match = _match_trigger(tile["trigger_data"], event_type, extra)
         print(f"[dink] tile={tile['title']!r} match={match}", flush=True)
         if not match:
